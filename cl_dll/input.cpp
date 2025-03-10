@@ -67,13 +67,6 @@ cvar_t	*cl_vsmoothing;
 
 static cvar_t *cl_autojump;
 
-static struct
-{
-	bool onground = false;
-	bool inwater  = false;
-	bool walking  = true; // Movetype == MOVETYPE_WALK. Filters out noclip, being on ladder, etc.
-} player;
-
 static void handle_autojump( usercmd_t *cmd )
 {
 	static bool s_jump_was_down_last_frame = false;
@@ -97,22 +90,6 @@ static void handle_autojump( usercmd_t *cmd )
 
 		s_jump_was_down_last_frame = ( ( cmd->buttons & IN_JUMP ) != 0 );
 	}
-
-	static void handle_ducktap(usercmd_t* cmd)
-	{
-		static bool s_duck_was_down_last_frame = false;
-
-		bool should_release_duck = (!player.onground && !player.inwater && player.walking);
-
-		if (s_duck_was_down_last_frame && player.onground && !player.inwater && player.walking)
-				should_release_duck = true;
-
-		if (should_release_duck)
-				cmd->buttons &= ~IN_DUCK;
-
-		s_duck_was_down_last_frame = ((cmd->buttons & IN_DUCK) != 0);
-	}
-}
 
 void update_player_info( int onground, int inwater, int walking )
 {
@@ -440,15 +417,6 @@ void IN_LeftDown(void) {KeyDown(&in_left);}
 void IN_LeftUp(void) {KeyUp(&in_left);}
 void IN_RightDown(void) {KeyDown(&in_right);}
 void IN_RightUp(void) {KeyUp(&in_right);}
-
-void IN_DucktapUp( void )
-{
-	KeyUp( &in_ducktap );
-}
-void IN_DucktapDown( void )
-{
-	KeyDown( &in_ducktap );
-}
 
 void IN_ForwardDown(void)
 {
@@ -1022,8 +990,6 @@ void InitInput (void)
 	gEngfuncs.pfnAddCommand ("-graph", IN_GraphUp);
 	gEngfuncs.pfnAddCommand ("+break",IN_BreakDown);
 	gEngfuncs.pfnAddCommand ("-break",IN_BreakUp);
-	gEngfuncs.pfnAddCommand( "+ducktap", IN_DucktapDown );
-	gEngfuncs.pfnAddCommand( "-ducktap", IN_DucktapUp );
 
 	lookstrafe			= gEngfuncs.pfnRegisterVariable ( "lookstrafe", "0", FCVAR_ARCHIVE );
 	lookspring			= gEngfuncs.pfnRegisterVariable ( "lookspring", "0", FCVAR_ARCHIVE );
