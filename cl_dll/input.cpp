@@ -67,6 +67,13 @@ cvar_t	*cl_vsmoothing;
 
 static cvar_t *cl_autojump;
 
+static struct
+{
+	bool onground = false;
+	bool inwater  = false;
+	bool walking  = true; // Movetype == MOVETYPE_WALK. Filters out noclip, being on ladder, etc.
+} player;
+
 static void handle_autojump( usercmd_t *cmd )
 {
 	static bool s_jump_was_down_last_frame = false;
