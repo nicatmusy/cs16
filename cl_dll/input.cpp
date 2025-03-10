@@ -441,6 +441,15 @@ void IN_LeftUp(void) {KeyUp(&in_left);}
 void IN_RightDown(void) {KeyDown(&in_right);}
 void IN_RightUp(void) {KeyUp(&in_right);}
 
+void IN_DucktapUp( void )
+{
+	KeyUp( &in_ducktap );
+}
+void IN_DucktapDown( void )
+{
+	KeyDown( &in_ducktap );
+}
+
 void IN_ForwardDown(void)
 {
 	KeyDown(&in_forward);
