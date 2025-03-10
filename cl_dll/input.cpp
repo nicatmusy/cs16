@@ -64,6 +64,63 @@ cvar_t	*cl_yawspeed;
 cvar_t	*cl_pitchspeed;
 cvar_t	*cl_anglespeedkey;
 cvar_t	*cl_vsmoothing;
+
+static cvar_t *cl_autojump;
+
+static struct
+{
+	bool onground = false;
+	bool inwater  = false;
+	bool walking  = true; // Movetype == MOVETYPE_WALK. Filters out noclip, being on ladder, etc.
+} player;
+
+static void handle_autojump( usercmd_t *cmd )
+{
+	static bool s_jump_was_down_last_frame = false;
+
+	if ( cl_autojump->value != 0.0f )
+	{
+		bool should_release_jump = ( !player.onground && !player.inwater && player.walking );
+
+		/*
+			 * Spam pressing and releasing jump if we're stuck in a spot where jumping still results in
+			 * being onground in the end of the frame. Without this check, +jump would remain held and
+			 * when the player exits this spot they would have to release and press the jump button to
+			 * start jumping again. This also helps with exiting water or ladder right onto the ground.
+			 */
+		if ( s_jump_was_down_last_frame && player.onground && !player.inwater && player.walking )
+			should_release_jump = true;
+
+			if ( should_release_jump )
+				cmd->buttons &= ~IN_JUMP;
+		}
+
+		s_jump_was_down_last_frame = ( ( cmd->buttons & IN_JUMP ) != 0 );
+	}
+
+	static void handle_ducktap(usercmd_t* cmd)
+	{
+		static bool s_duck_was_down_last_frame = false;
+
+		bool should_release_duck = (!player.onground && !player.inwater && player.walking);
+
+		if (s_duck_was_down_last_frame && player.onground && !player.inwater && player.walking)
+				should_release_duck = true;
+
+		if (should_release_duck)
+				cmd->buttons &= ~IN_DUCK;
+
+		s_duck_was_down_last_frame = ((cmd->buttons & IN_DUCK) != 0);
+	}
+}
+
+void update_player_info( int onground, int inwater, int walking )
+{
+	autofuncs::player.onground = ( onground != 0 );
+	autofuncs::player.inwater  = ( inwater != 0 );
+	autofuncs::player.walking  = ( walking != 0 );
+}
+	
 /*
 ===============================================================================
 
@@ -956,6 +1013,8 @@ void InitInput (void)
 	gEngfuncs.pfnAddCommand ("-graph", IN_GraphUp);
 	gEngfuncs.pfnAddCommand ("+break",IN_BreakDown);
 	gEngfuncs.pfnAddCommand ("-break",IN_BreakUp);
+	gEngfuncs.pfnAddCommand( "+ducktap", IN_DucktapDown );
+	gEngfuncs.pfnAddCommand( "-ducktap", IN_DucktapUp );
 
 	lookstrafe			= gEngfuncs.pfnRegisterVariable ( "lookstrafe", "0", FCVAR_ARCHIVE );
 	lookspring			= gEngfuncs.pfnRegisterVariable ( "lookspring", "0", FCVAR_ARCHIVE );
