@@ -27,11 +27,12 @@
 #include "vgui_parser.h"
 #include "com_weapons.h"
 
+
 extern int g_weaponselect;
 extern cl_enginefunc_t gEngfuncs;
 
 // Defined in pm_math.c
-float anglemod( float a );
+extern "C" float anglemod( float a );
 
 void IN_Init (void);
 void IN_Move ( float frametime, usercmd_t *cmd);
@@ -65,6 +66,8 @@ cvar_t	*cl_pitchspeed;
 cvar_t	*cl_anglespeedkey;
 cvar_t	*cl_vsmoothing;
 
+namespace autofuncs
+{
 static cvar_t *cl_autojump;
 
 static struct
@@ -98,14 +101,29 @@ static void handle_autojump( usercmd_t *cmd )
 		s_jump_was_down_last_frame = ( ( cmd->buttons & IN_JUMP ) != 0 );
 	}
 
+	static void handle_ducktap(usercmd_t* cmd)
+	{
+		static bool s_duck_was_down_last_frame = false;
+
+		bool should_release_duck = (!player.onground && !player.inwater && player.walking);
+
+		if (s_duck_was_down_last_frame && player.onground && !player.inwater && player.walking)
+				should_release_duck = true;
+
+		if (should_release_duck)
+				cmd->buttons &= ~IN_DUCK;
+
+		s_duck_was_down_last_frame = ((cmd->buttons & IN_DUCK) != 0);
+	}
+}
+
 void update_player_info( int onground, int inwater, int walking )
 {
 	autofuncs::player.onground = ( onground != 0 );
 	autofuncs::player.inwater  = ( inwater != 0 );
 	autofuncs::player.walking  = ( walking != 0 );
 }
-	
-/*
+		/*
 ===============================================================================
 
 KEY BUTTONS
@@ -152,6 +170,7 @@ kbutton_t	in_alt1;
 kbutton_t	in_score;
 kbutton_t	in_break;
 kbutton_t	in_graph;  // Display the netgraph
+kbutton_t in_ducktap;
 
 struct kblist_t
 {
@@ -424,6 +443,16 @@ void IN_LeftDown(void) {KeyDown(&in_left);}
 void IN_LeftUp(void) {KeyUp(&in_left);}
 void IN_RightDown(void) {KeyDown(&in_right);}
 void IN_RightUp(void) {KeyUp(&in_right);}
+void IN_DucktapUp( void )
+{
+	KeyUp( &in_ducktap );
+}
+void IN_DucktapDown( void )
+{
+	KeyDown( &in_ducktap );
+}
+
+
 
 void IN_ForwardDown(void)
 {
@@ -590,8 +619,7 @@ float CL_KeyState (kbutton_t *key)
 	if ( impulseup && !impulsedown )
 	{
 		// released this frame?
-		// val = down ? 0.0 : 0.0;
-		val = 0.0;
+		val = down ? 0.0 : 0.0;
 	}
 
 	if ( !impulsedown && !impulseup )
@@ -764,9 +792,13 @@ void DLLEXPORT CL_CreateMove ( float frametime, struct usercmd_s *cmd, int activ
 	//
 	cmd->buttons = CL_ButtonBits( 1 );
 
-	// If they're in a modal dialog, ignore the attack button.
-	if ( GetClientVoice()->IsInSquelchMode() )
-		cmd->buttons &= ~IN_ATTACK;
+	if ( in_ducktap.state & 1 )
+	{
+		cmd->buttons |= IN_DUCK;
+		autofuncs::handle_ducktap( cmd ); // Ducktap takes priority over autojump
+	}
+	else 
+		autofuncs::handle_autojump( cmd );
 
 	// Using joystick?
 	if ( in_joystick->value )
@@ -908,6 +940,7 @@ int CL_ButtonBits( int bResetState )
 		in_reload.state &= ~2;
 		in_alt1.state &= ~2;
 		in_score.state &= ~2;
+		in_ducktap.state &= ~2;
 	}
 
 	return bits;
@@ -997,6 +1030,8 @@ void InitInput (void)
 	gEngfuncs.pfnAddCommand ("-graph", IN_GraphUp);
 	gEngfuncs.pfnAddCommand ("+break",IN_BreakDown);
 	gEngfuncs.pfnAddCommand ("-break",IN_BreakUp);
+	gEngfuncs.pfnAddCommand( "+ducktap", IN_DucktapDown );
+	gEngfuncs.pfnAddCommand( "-ducktap", IN_DucktapUp );
 
 	lookstrafe			= gEngfuncs.pfnRegisterVariable ( "lookstrafe", "0", FCVAR_ARCHIVE );
 	lookspring			= gEngfuncs.pfnRegisterVariable ( "lookspring", "0", FCVAR_ARCHIVE );
@@ -1007,11 +1042,12 @@ void InitInput (void)
 	cl_forwardspeed		= gEngfuncs.pfnRegisterVariable ( "cl_forwardspeed", "400", FCVAR_ARCHIVE );
 	cl_backspeed		= gEngfuncs.pfnRegisterVariable ( "cl_backspeed", "400", FCVAR_ARCHIVE );
 	cl_sidespeed		= gEngfuncs.pfnRegisterVariable ( "cl_sidespeed", "400", 0 );
-	cl_movespeedkey		= gEngfuncs.pfnRegisterVariable ( "cl_movespeedkey", "0.52", 0 );
+	cl_movespeedkey		= gEngfuncs.pfnRegisterVariable ( "cl_movespeedkey", "0.3", 0 );
 	cl_pitchup			= gEngfuncs.pfnRegisterVariable ( "cl_pitchup", "89", 0 );
 	cl_pitchdown		= gEngfuncs.pfnRegisterVariable ( "cl_pitchdown", "89", 0 );
 
 	cl_vsmoothing		= gEngfuncs.pfnRegisterVariable ( "cl_vsmoothing", "0.05", FCVAR_ARCHIVE );
+	autofuncs::cl_autojump = gEngfuncs.pfnRegisterVariable( "cl_autojump", "1", FCVAR_ARCHIVE );
 
 	m_pitch			    = gEngfuncs.pfnRegisterVariable ( "m_pitch","0.022", FCVAR_ARCHIVE );
 	m_yaw				= gEngfuncs.pfnRegisterVariable ( "m_yaw","0.022", FCVAR_ARCHIVE );
